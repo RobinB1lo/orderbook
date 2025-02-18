@@ -1,6 +1,9 @@
+from collections import defaultdict
+
 class OrderBook:
     def __init__(self):
-        self.orders = {}
+        self.asks = {}
+        self.bids = {}
 
     def fillOrder(self, ord):
         return 
@@ -8,10 +11,12 @@ class OrderBook:
     def cancelOrder(self, ordID):
         return 
     
-    def bids(self):
+    def addBid():
+        
         return 
     
-    def asks(self):
+    def addAsk():
+        
         return 
 
 
@@ -21,8 +26,8 @@ class Order:
     def __init__(self, orderquantity, side): 
         self.orderID = Order._next_orderId_
         self.initialquantitiy = self.remainingquantitiy = orderquantity
-        Order._next_orderId_ += 1
         self.orderside = side
+        Order._next_orderId_ += 1
     
     def getorderSide(self):
         return self.orderside
@@ -41,12 +46,28 @@ class Order:
     
 
 class Trade:
-    def __init__(self):
-        return 
+
+    trade_log = {}
+
+    def __init__(self, trade_id, trade_price, trade_quantity):
+        self.trade_id = trade_id
+        self.trade_price = trade_price
+        self.trade_quantity = trade_quantity
+        
+        Trade.trade_log[trade_id] = {
+            'price' : trade_price,
+            'quantity' : trade_quantity
+        }
     
-    def tradeInfo(self):
-        return 
+    @classmethod
+    def getTradelog(cls):
+        return cls.trade_log
+
+    def getTradeinfo(self):
+        return f"Trade ID: {self.trade_id}\t Trade price: {self.trade_price}\t Trade Quantity: {self.trade_quantity}\t Total: {self.trade_quantity * self.trade_price}"
     
 class MatchingEngine:
     def __init__(self):
         return
+    
+=
