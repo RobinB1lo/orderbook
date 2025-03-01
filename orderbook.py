@@ -4,11 +4,11 @@ class OrderBook:
     def __init__(self):
         self.asks = {}
         self.bids = {}
-        self.ask_prices = {}
-        self.bid_prices = {}
+        self.ask_prices = []
+        self.bid_prices = []
         self.orders = {}
 
-    def fillOrder(self, ord):
+    def fill_order(self, ord):
         if ord.getorderSide().lower() == 'buy':
             self.process_buy_order(ord)
         elif ord.getorderSide().lower() == 'sell':
@@ -29,7 +29,7 @@ class OrderBook:
             while ask_orders and rem_quantity > 0:
                 curr_ask = ask_orders[0]
                 trade_quantitiy = min(curr_ask.remainingquantitiy, rem_quantity)
-                self.execute_trade(curr_ask, ord, best_ask_price, trade_quantitiy)
+                self.execute_trade(best_ask_price, trade_quantitiy)
                 curr_ask.remainingquantitiy -= trade_quantitiy
                 rem_quantity -= trade_quantitiy
                 if curr_ask.remainingquantitiy == 0:
@@ -56,7 +56,7 @@ class OrderBook:
             while bid_orders and rem_quantity < 0:
                 curr_bid = bid_orders[0]
                 trade_quantity = min(curr_bid.remainingquantity, rem_quantity)
-                self.execute_trade(ord, curr_bid, best_bid_price, trade_quantity)
+                self.execute_trade(best_bid_price, trade_quantity)
                 curr_bid.remainingquantity -= trade_quantity
                 rem_quantity -= trade_quantity
                 if curr_bid.remainingquantity == 0:
@@ -70,18 +70,35 @@ class OrderBook:
             self.addask(ord)
         return True
     
-    def execute_trade(self, sell_ord, buy_ord, price, quantitiy):
-        ``
-    
-    def cancel_order(self, ordID):
+    def execute_trade(self, price, quantitiy):
+        trade_id = len(Trade.trade_log) + 1
+        Trade(trade_id, price, quantitiy)
+
+    def add_bid(ord):
+        price = ord.orderprice
+        temp = []
+        if price not in self.bids:
+            for p in self.bid_prices:
+                temp.append(-p)
+            index = bisect.bisect_left(temp, -price)
+            self.bid_prices.insert(index, price)
+            self.bids[price] = []
+        self.bids[price].append(ord)
+        self.orders[ord.orderID] = (price, 'bid')
+
+    def add_ask(ord):
+        price = ord.orderprice
+        if price not in self.asks:
+            index = bisect.bisect_left(self.ask_prices, price)
+            self.ask_price.insert(index, price)
+            self.bids[price] = []
+        self.asks[price].append(ord)
+        self.orders[ord.orderID] = (price, 'ask')
+        
+
+    def cancel_order(self):
         return 
-    
-    def addbid(ord):
-        self.bid[ord.ordID] = ord.orderprice, ord.remainingquantity
-    
-    def addask(ord):
-        self.ask[ord.orderID] = ord.orderprice, ord.remainingquantity
-    
+        
 class Order:
     _next_orderId_ = 0
 
@@ -92,22 +109,22 @@ class Order:
         self.orderside = side
         Order._next_orderId_ += 1
     
-    def getorderPrice(self):
+    def get_order_price(self):
         return self.orderprice
     
-    def getorderSide(self):
+    def get_order_side(self):
         return self.orderside
 
-    def getorderId(self):
+    def get_order_id(self):
         return self.orderID
 
-    def getinitialquantitiy(self):
+    def get_initial_quantitiy(self):
         return self.initialquantitiy
 
-    def getremainingquantitiy(self):
+    def get_remaining_quantitiy(self):
         return self.remainingquantitiy
     
-    def getfilledquantity(self):
+    def get_filled_quantity(self):
         return (self.initialquantitiy - self.remainingquantitiy)
     
 
@@ -115,7 +132,7 @@ class Trade:
 
     trade_log = {}
 
-    def __init__(self, trade_id, trade_price, trade_quantity):
+    def __init__(self, trade_id, bid, ask, trade_price, trade_quantity):
         self.trade_id = trade_id
         self.trade_price = trade_price
         self.trade_quantity = trade_quantity
@@ -124,25 +141,11 @@ class Trade:
             'price' : trade_price,
             'quantity' : trade_quantity
         }
-    
+
     @classmethod
-    def getTradelog(cls):
+    def get_trade_log(cls):
         return cls.trade_log
 
-    def getTradeinfo(self):
+    def get_trade_info(self):
         return f"Trade ID: {self.trade_id}\t Trade price: {self.trade_price}\t Trade Quantity: {self.trade_quantity}\t Total: {self.trade_quantity * self.trade_price}"
     
-class MatchingEngine:
-    def __init__(self, asks, bids):
-        self.asks = asks
-        self.bids = bids 
-
-    
-    def matchorder(self, order, orderbook):
-        for order in orderbook:
-            orderbook[order]
-        # the sorting might be a problem, right now the key is the ID of the order but do we want to make it the price, either way we will have to look through the while dict
-        # maybe whe ninseerting in the bid and asks list we can order them in terms of price then time in a rolling manner, 
-        # because the matching engine is used to see if an order can be matched right away and if it can't then it goes in the bids or asks dict and waits to be matched, if we can somehow place
-        # them in the correct order it would work well we will just have to check evey price value int he dicts which is o(n) at worst 
-        return
