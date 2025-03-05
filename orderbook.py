@@ -2,7 +2,7 @@ import bisect
 import yfinance as yf 
 import datetime as dt #for future features
 import time #for future features
-import csv
+import csv #for future features
 
 class OrderBook:
     def __init__(self):
@@ -186,14 +186,6 @@ class Trade:
     def get_trade_info(self):
         return f"Trade ID: {self.trade_id}\t Trade price: {self.trade_price}\t Trade Quantity: {self.trade_quantity}\t Total: {self.trade_quantity * self.trade_price}"
 
-#Will be the user interface, will start off as a command line app
-#Have to add feature so that th euser can't cancel other people's orders 
-#Multi-line print statement with 3 """ """
 def main():
-    #ticker = 
-    orderbook = OrderBook()
-    new_order = Order(100, 10000, "buy")
-    orderbook.fill_order(new_order)
-    return orderbook.bids
-
-print(main())
+    return 
+    
