@@ -1,4 +1,7 @@
 import bisect
+import yfinance as yf
+import datetime as dt
+import time 
 
 class OrderBook:
     def __init__(self):
@@ -100,20 +103,39 @@ class OrderBook:
             return False
         price, side = self.orders[orderID]
         del self.orders[orderID]
+
         if side == 'bid':
-            for i in range(len(self.bids[price])):
-                if self.bids[price][i] == price:
-                    self.bids[price].pop(i)
+            order_list = self.bids.get(price, [])
+
+            for i, order in enumerate(order_list):
+                if order.orderID == orderID:
+                    order_list.pop(i)
+                    break
+            
+            if not order_list:
+                if price in self.bids:
+                    del self.bids[price]
+
+                index = bisect.bisect_left(self.bid_prices, price)
+                if index < len(self.bid_prices) and self.bid_prices[index] == price:
+                    self.bid_prices.pop(index)
+        
         elif side == 'ask':
-            for i in range(len(self.asks[price])):
-                if self.asks[price][i] == price:
-                    self.asks[price].pop(i)
-        for i in range(len(self.bid_prices[price])):
-                if self.bid_prices[i] == price:
-                    self.bid_prices[price].pop(i)
-        for i in range(len(self.ask_prices[price])):
-                if self.ask_prices[i] == price:
-                    self.ask_prices[price].pop(i)
+            order_list = self.bids.get(price, [])
+
+            for i, order in enumerate(order_list):
+                if order.orderID == orderID:
+                    order_list.pop(i)
+                    break
+            
+            if not order_list:
+                if price in self.asks:
+                    del self.asks[price]
+
+                index = bisect.bisect_left(self.ask_prices, price)
+                if index < len(self.ask_prices) and self.ask_prices[index] == price:
+                    self.ask_prices.pop(index)
+
         return True 
     
 class Order:
@@ -165,4 +187,6 @@ class Trade:
 #Will be the user interface, will start off as a command line app
 #Have to add feature so that th euser can't cancel other people's orders 
 def main():
+
+    
     return 
