@@ -1,7 +1,8 @@
 import bisect
-import yfinance as yf
-import datetime as dt
-import time 
+import yfinance as yf 
+import datetime as dt #for future features
+import time #for future features
+import csv
 
 class OrderBook:
     def __init__(self):
@@ -12,9 +13,9 @@ class OrderBook:
         self.orders = {}
 
     def fill_order(self, order):
-        if order.getorderSide().lower() == "buy":
+        if order.get_order_side().lower() == "buy":
             self.process_buy_order(order)
-        elif order.getorderSide().lower() == "sell":
+        elif order.get_order_side().lower() == "sell":
             self.process_sell_order(order)
         else:
             raise ValueError("Invalid order side")
@@ -23,11 +24,11 @@ class OrderBook:
         remaining_quantity = order.remainingquantitiy
         while remaining_quantity > 0 and self.ask_prices:
             best_ask_price = self.ask_prices[0]
-            if best_ask_price > order.orderprice:
+            if best_ask_price > order.get_order_price():
                 break
             ask_orders = []
             for ask in self.asks:
-                if ask.orderprice == best_ask_price:
+                if ask.get_order_price() == best_ask_price:
                     ask_orders.append(ask)
             while ask_orders and remaining_quantity > 0:
                 curr_ask = ask_orders[0]
@@ -43,18 +44,18 @@ class OrderBook:
                         del self.asks[best_ask_price]
         if remaining_quantity > 0:
             order.remainingquantitiy = remaining_quantity
-            self.addbid(ord)
+            self.add_bid(order)
         return True
 
     def process_sell_order(self, order):
         remaining_quantity = order.remainingquantitiy
         while remaining_quantity > 0 and self.bid_prices:
             best_bid_price = self.bid_prices[0]
-            if best_bid_price < order.orderprice:
+            if best_bid_price < order.get_order_price():
                 break
             bid_orders = []
             for bid in self.bids:
-                if bid.orderprice == best_bid_price:
+                if bid.get_order_price() == best_bid_price:
                     bid_orders.append(bid)
             while bid_orders and remaining_quantity < 0:
                 curr_bid = bid_orders[0]
@@ -70,7 +71,7 @@ class OrderBook:
                         del self.bids[best_bid_price]
         if remaining_quantity > 0:
             order.remainingquantitiy = remaining_quantity
-            self.addask(order)
+            self.add_ask(order)
         return True
 
     def execute_trade(self, price, quantitiy):
@@ -78,7 +79,7 @@ class OrderBook:
         Trade(trade_id, price, quantitiy)
 
     def add_bid(self, order):
-        price = order.orderprice
+        price = order.get_order_price()
         temp = []
         if price not in self.bids:
             for p in self.bid_prices:
@@ -90,7 +91,7 @@ class OrderBook:
         self.orders[order.orderID] = (price, "bid")
 
     def add_ask(self, order):
-        price = order.orderprice
+        price = order.get_order_price()
         if price not in self.asks:
             index = bisect.bisect_left(self.ask_prices, price)
             self.ask_prices.insert(index, price)
@@ -143,13 +144,14 @@ class Order:
 
     def __init__(self, orderprice, orderquantity, side):
         self.orderID = Order._next_orderId_
-        self.initialquantitiy = self.remainingquantitiy = orderquantity
-        self.orderprice = orderprice
+        self.initialquantitiy = orderquantity
+        self.remainingquantitiy = orderquantity
+        self.order_price = orderprice
         self.orderside = side
         Order._next_orderId_ += 1
 
     def get_order_price(self):
-        return self.orderprice
+        return self.order_price
 
     def get_order_side(self):
         return self.orderside
@@ -186,7 +188,12 @@ class Trade:
 
 #Will be the user interface, will start off as a command line app
 #Have to add feature so that th euser can't cancel other people's orders 
+#Multi-line print statement with 3 """ """
 def main():
+    #ticker = 
+    orderbook = OrderBook()
+    new_order = Order(100, 10000, "buy")
+    orderbook.fill_order(new_order)
+    return orderbook.bids
 
-    
-    return 
+print(main())
