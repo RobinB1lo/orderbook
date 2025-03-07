@@ -1,5 +1,6 @@
 import bisect
 import yfinance as yf 
+from side import Side
 import datetime as dt #for future features
 import time #for future features
 import csv #for future features
@@ -21,56 +22,56 @@ class OrderBook:
             raise ValueError("Invalid order side")
 
     def process_buy_order(self, order):
-        remaining_quantity = order.remainingquantitiy
+        remaining_quantity = order.remaining_quantitiy
         while remaining_quantity > 0 and self.ask_prices:
             best_ask_price = self.ask_prices[0]
             if best_ask_price > order.get_order_price():
                 break
             ask_orders = []
             for ask in self.asks:
-                if ask.get_order_price() == best_ask_price:
+                if ask == best_ask_price:
                     ask_orders.append(ask)
             while ask_orders and remaining_quantity > 0:
                 curr_ask = ask_orders[0]
-                trade_quantitiy = min(curr_ask.remainingquantitiy, remaining_quantity)
+                trade_quantitiy = min(curr_ask.remaining_quantitiy, remaining_quantity)
                 self.execute_trade(best_ask_price, trade_quantitiy)
-                curr_ask.remainingquantitiy -= trade_quantitiy
+                curr_ask.remaining_quantitiy -= trade_quantitiy
                 remaining_quantity -= trade_quantitiy
-                if curr_ask.remainingquantitiy == 0:
+                if curr_ask.remaining_quantitiy == 0:
                     ask_orders.pop(0)
                     self.orders.pop(curr_ask.orderID)
                     if not ask_orders:
                         self.ask_prices.pop(0)
                         del self.asks[best_ask_price]
         if remaining_quantity > 0:
-            order.remainingquantitiy = remaining_quantity
+            order.remaining_quantitiy = remaining_quantity
             self.add_bid(order)
         return True
 
     def process_sell_order(self, order):
-        remaining_quantity = order.remainingquantitiy
+        remaining_quantity = order.remaining_quantitiy
         while remaining_quantity > 0 and self.bid_prices:
             best_bid_price = self.bid_prices[0]
             if best_bid_price < order.get_order_price():
                 break
             bid_orders = []
             for bid in self.bids:
-                if bid.get_order_price() == best_bid_price:
+                if bid == best_bid_price:
                     bid_orders.append(bid)
             while bid_orders and remaining_quantity < 0:
                 curr_bid = bid_orders[0]
-                trade_quantity = min(curr_bid.remainingquantity, remaining_quantity)
+                trade_quantity = min(curr_bid.remaining_quantity, remaining_quantity)
                 self.execute_trade(best_bid_price, trade_quantity)
-                curr_bid.remainingquantity -= trade_quantity
+                curr_bid.remaining_quantity -= trade_quantity
                 remaining_quantity -= trade_quantity
-                if curr_bid.remainingquantity == 0:
+                if curr_bid.remaining_quantity == 0:
                     bid_orders.pop(0)
                     self.orders.pop(curr_bid.orderID)
                     if not bid_orders:
                         self.bid_prices.pop(0)
                         del self.bids[best_bid_price]
         if remaining_quantity > 0:
-            order.remainingquantitiy = remaining_quantity
+            order.remaining_quantitiy = remaining_quantity
             self.add_ask(order)
         return True
 
@@ -95,7 +96,7 @@ class OrderBook:
         if price not in self.asks:
             index = bisect.bisect_left(self.ask_prices, price)
             self.ask_prices.insert(index, price)
-            self.bids[price] = []
+            self.asks[price] = []
         self.asks[price].append(order)
         self.orders[order.orderID] = (price, "ask")
 
@@ -145,7 +146,7 @@ class Order:
     def __init__(self, orderprice, orderquantity, side):
         self.orderID = Order._next_orderId_
         self.initialquantitiy = orderquantity
-        self.remainingquantitiy = orderquantity
+        self.remaining_quantitiy = orderquantity
         self.order_price = orderprice
         self.orderside = side
         Order._next_orderId_ += 1
@@ -163,10 +164,10 @@ class Order:
         return self.initialquantitiy
 
     def get_remaining_quantitiy(self):
-        return self.remainingquantitiy
+        return self.remaining_quantitiy
 
     def get_filled_quantity(self):
-        return self.initialquantitiy - self.remainingquantitiy
+        return self.initialquantitiy - self.remaining_quantitiy
 
 
 class Trade:
@@ -186,6 +187,14 @@ class Trade:
     def get_trade_info(self):
         return f"Trade ID: {self.trade_id}\t Trade price: {self.trade_price}\t Trade Quantity: {self.trade_quantity}\t Total: {self.trade_quantity * self.trade_price}"
 
+orderbook = OrderBook()
+
+#you can also ask help from gpt for how to implement enums
 def main():
-    return 
+    new_order = Order(100, 1000, "sell")
+    new_order2 = Order(100, 500, "buy")
+    orderbook.fill_order(new_order)
+    orderbook.fill_order(new_order2)
+    return orderbook.asks, orderbook.bids
     
+print(main())
