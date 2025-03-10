@@ -14,9 +14,9 @@ class OrderBook:
         self.orders = {}
 
     def fill_order(self, order):
-        if order.get_order_side().lower() == "buy":
+        if order.get_order_side() == Side.BUY:
             self.process_buy_order(order)
-        elif order.get_order_side().lower() == "sell":
+        elif order.get_order_side() == Side.SELL:
             self.process_sell_order(order)
         else:
             raise ValueError("Invalid order side")
@@ -106,7 +106,7 @@ class OrderBook:
         price, side = self.orders[orderID]
         del self.orders[orderID]
 
-        if side == 'bid':
+        if side == Side.BUY:
             order_list = self.bids.get(price, [])
 
             for i, order in enumerate(order_list):
@@ -122,7 +122,7 @@ class OrderBook:
                 if index < len(self.bid_prices) and self.bid_prices[index] == price:
                     self.bid_prices.pop(index)
         
-        elif side == 'ask':
+        elif side == Side.SELL:
             order_list = self.bids.get(price, [])
 
             for i, order in enumerate(order_list):
@@ -144,18 +144,20 @@ class Order:
     _next_orderId_ = 0
 
     def __init__(self, orderprice, orderquantity, side):
+        if side not in (Side.SELL, Side.BUY):
+            raise ValueError("Side must be 0 (sell) or 1 (buy)")
         self.orderID = Order._next_orderId_
         self.initialquantitiy = orderquantity
         self.remaining_quantitiy = orderquantity
         self.order_price = orderprice
-        self.orderside = side
+        self.order_side = side
         Order._next_orderId_ += 1
 
     def get_order_price(self):
         return self.order_price
 
     def get_order_side(self):
-        return self.orderside
+        return self.order_side
 
     def get_order_id(self):
         return self.orderID
@@ -189,7 +191,6 @@ class Trade:
 
 orderbook = OrderBook()
 
-#you can also ask help from gpt for how to implement enums
 def main():
     new_order = Order(100, 1000, "sell")
     new_order2 = Order(100, 500, "buy")
