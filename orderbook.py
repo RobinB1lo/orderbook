@@ -1,6 +1,6 @@
 import bisect
-import yfinance as yf 
 from side import Side
+import yfinance as yf # for future featurs 
 import datetime as dt #for future features
 import time #for future features
 import csv #for future features
