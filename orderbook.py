@@ -1,5 +1,5 @@
 import bisect
-from side import Side
+from enums import Side, Type
 import yfinance as yf # for future featurs 
 import datetime as dt #for future features
 import time #for future features
