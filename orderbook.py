@@ -1,9 +1,10 @@
 import bisect
 from enums import Side, Type
-import yfinance as yf # for future featurs 
-import datetime as dt #for future features
-import time #for future features
-import csv #for future features
+import yfinance as yf  # for future featurs
+import datetime as dt  # for future features
+import time  # for future features
+import csv  # for future features
+
 
 class OrderBook:
     def __init__(self):
@@ -113,7 +114,7 @@ class OrderBook:
                 if order.orderID == orderID:
                     order_list.pop(i)
                     break
-            
+
             if not order_list:
                 if price in self.bids:
                     del self.bids[price]
@@ -121,7 +122,7 @@ class OrderBook:
                 index = bisect.bisect_left(self.bid_prices, price)
                 if index < len(self.bid_prices) and self.bid_prices[index] == price:
                     self.bid_prices.pop(index)
-        
+
         elif side == Side.SELL:
             order_list = self.bids.get(price, [])
 
@@ -129,7 +130,7 @@ class OrderBook:
                 if order.orderID == orderID:
                     order_list.pop(i)
                     break
-            
+
             if not order_list:
                 if price in self.asks:
                     del self.asks[price]
@@ -138,23 +139,30 @@ class OrderBook:
                 if index < len(self.ask_prices) and self.ask_prices[index] == price:
                     self.ask_prices.pop(index)
 
-        return True 
-    
+        return True
+
+
 class Order:
     _next_orderId_ = 0
 
-    def __init__(self, orderprice, orderquantity, side):
+    def __init__(self, orderprice, orderquantity, type, side):
         if side not in (Side.SELL, Side.BUY):
             raise ValueError("Side must be 0 (sell) or 1 (buy)")
+        if type not in(Type.FOK, Type.LIMIT, Type.MARKET):
+            raise ValueError("Type must be 0 (Limit), 1 (Market), or 2 (Fill Or Kill)")
         self.orderID = Order._next_orderId_
         self.initialquantitiy = orderquantity
         self.remaining_quantitiy = orderquantity
         self.order_price = orderprice
         self.order_side = side
+        self.order_type = type
         Order._next_orderId_ += 1
 
     def get_order_price(self):
         return self.order_price
+    
+    def get_order_type(self):
+        return self.order_type
 
     def get_order_side(self):
         return self.order_side
@@ -175,12 +183,13 @@ class Order:
 class Trade:
     trade_log = {}
 
-    def __init__(self, trade_id, bid, ask, trade_price, trade_quantity):
+    def __init__(self, trade_id, trade_price, trade_type, trade_quantity):
         self.trade_id = trade_id
         self.trade_price = trade_price
+        self.trade_type = trade_type
         self.trade_quantity = trade_quantity
 
-        Trade.trade_log[trade_id] = {"price": trade_price, "quantity": trade_quantity}
+        Trade.trade_log[trade_id] = {"price": trade_price, "quantity": trade_quantity, "type": trade_type}
 
     @classmethod
     def get_trade_log(cls):
@@ -189,7 +198,9 @@ class Trade:
     def get_trade_info(self):
         return f"Trade ID: {self.trade_id}\t Trade price: {self.trade_price}\t Trade Quantity: {self.trade_quantity}\t Total: {self.trade_quantity * self.trade_price}"
 
+
 orderbook = OrderBook()
+
 
 def main():
     new_order = Order(100, 1000, "sell")
@@ -197,5 +208,6 @@ def main():
     orderbook.fill_order(new_order)
     orderbook.fill_order(new_order2)
     return orderbook.asks, orderbook.bids
-    
+
+
 print(main())
