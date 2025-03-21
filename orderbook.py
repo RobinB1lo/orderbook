@@ -1,9 +1,9 @@
 import bisect
 from enums import Side, Type
-import yfinance as yf  # for future featurs
-import datetime as dt  # for future features
-import time  # for future features
-import csv  # for future features
+#import yfinance as yf
+#import datetime as dt  
+#import time  
+#import csv  
 
 
 class OrderBook:
@@ -26,24 +26,36 @@ class OrderBook:
         remaining_quantity = order.remaining_quantitiy
         while remaining_quantity > 0 and self.ask_prices:
             best_ask_price = self.ask_prices[0]
-            if best_ask_price > order.get_order_price():
-                break
-            ask_orders = []
-            for ask in self.asks:
-                if ask == best_ask_price:
-                    ask_orders.append(ask)
-            while ask_orders and remaining_quantity > 0:
-                curr_ask = ask_orders[0]
+            if order.get_order_type() == Type.MARKET:
+                curr_ask = self.asks[0]
                 trade_quantitiy = min(curr_ask.remaining_quantitiy, remaining_quantity)
                 self.execute_trade(best_ask_price, trade_quantitiy)
                 curr_ask.remaining_quantitiy -= trade_quantitiy
                 remaining_quantity -= trade_quantitiy
                 if curr_ask.remaining_quantitiy == 0:
-                    ask_orders.pop(0)
-                    self.orders.pop(curr_ask.orderID)
-                    if not ask_orders:
                         self.ask_prices.pop(0)
                         del self.asks[best_ask_price]
+            elif order.get_order_type() == Type.FOK:
+                return 
+            elif order.get_order_type() == Type.LIMIT:
+                if best_ask_price > order.get_order_price():
+                    break
+                ask_orders = []
+                for ask in self.asks:
+                    if ask == best_ask_price:
+                        ask_orders.append(ask)
+                while ask_orders and remaining_quantity > 0:
+                    curr_ask = ask_orders[0]
+                    trade_quantitiy = min(curr_ask.remaining_quantitiy, remaining_quantity)
+                    self.execute_trade(best_ask_price, trade_quantitiy)
+                    curr_ask.remaining_quantitiy -= trade_quantitiy
+                    remaining_quantity -= trade_quantitiy
+                    if curr_ask.remaining_quantitiy == 0:
+                        ask_orders.pop(0)
+                        self.orders.pop(curr_ask.orderID)
+                        if not ask_orders:
+                            self.ask_prices.pop(0)
+                            del self.asks[best_ask_price]
         if remaining_quantity > 0:
             order.remaining_quantitiy = remaining_quantity
             self.add_bid(order)
