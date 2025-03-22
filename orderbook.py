@@ -1,9 +1,11 @@
 import bisect
 from enums import Side, Type
-#import yfinance as yf
-#import datetime as dt  
-#import time  
-#import csv  
+from fastapi import FastAPI
+
+# import yfinance as yf
+# import datetime as dt
+# import time
+# import csv
 
 
 class OrderBook:
@@ -24,81 +26,122 @@ class OrderBook:
 
     def process_buy_order(self, order):
         remaining_quantity = order.remaining_quantitiy
+
+        if order.get_order_type() == Type.FOK:
+            total_available = self.calculate_available_asks(order.get_order_price())
+            if total_available < remaining_quantity:
+                return False
+
         while remaining_quantity > 0 and self.ask_prices:
-            best_ask_price = self.ask_prices[0]
-            if order.get_order_type() == Type.MARKET:
-                curr_ask = self.asks[0]
-                trade_quantitiy = min(curr_ask.remaining_quantitiy, remaining_quantity)
-                self.execute_trade(best_ask_price, trade_quantitiy)
-                curr_ask.remaining_quantitiy -= trade_quantitiy
-                remaining_quantity -= trade_quantitiy
-                if curr_ask.remaining_quantitiy == 0:
-                        self.ask_prices.pop(0)
-                        del self.asks[best_ask_price]
-            elif order.get_order_type() == Type.FOK:
-                return 
-            elif order.get_order_type() == Type.LIMIT:
-                if best_ask_price > order.get_order_price():
-                    break
-                ask_orders = []
-                for ask in self.asks:
-                    if ask == best_ask_price:
-                        ask_orders.append(ask)
-                while ask_orders and remaining_quantity > 0:
-                    curr_ask = ask_orders[0]
-                    trade_quantitiy = min(curr_ask.remaining_quantitiy, remaining_quantity)
-                    self.execute_trade(best_ask_price, trade_quantitiy)
-                    curr_ask.remaining_quantitiy -= trade_quantitiy
-                    remaining_quantity -= trade_quantitiy
-                    if curr_ask.remaining_quantitiy == 0:
-                        ask_orders.pop(0)
-                        self.orders.pop(curr_ask.orderID)
-                        if not ask_orders:
-                            self.ask_prices.pop(0)
-                            del self.asks[best_ask_price]
-        if remaining_quantity > 0:
-            order.remaining_quantitiy = remaining_quantity
-            self.add_bid(order)
-        return True
+            best_ask = self.ask_prices[0]
+
+            if (
+                order.get_order_type() == Type.LIMIT
+                and best_ask > order.get_order_price()
+            ):
+                break
+
+            orders_at_price = self.asks[best_ask]
+            while orders_at_price and remaining_quantity > 0:
+                curr_ask = orders_at_price[0]
+                trade_quantity = min(curr_ask.remaining_quantity, remaining_quantity)
+
+                self.execute_trade(
+                    curr_ask.order_price, trade_quantity, order.order_type
+                )
+
+                curr_ask.remaining_quantity -= trade_quantity
+                remaining_quantity -= trade_quantity
+
+                if curr_ask.remaining_quantity == 0:
+                    orders_at_price.pop(0)
+                    self.orders.pop(curr_ask.order_id)
+
+                if not orders_at_price:
+                    self.ask_prices.pop(0)
+                    del self.asks[best_ask]
+
+                if order.get_order_type() == Type.FOK and remaining_quantity > 0:
+                    return False
+
+            if remaining_quantity > 0 and order.get_order_type() == Type.LIMIT:
+                self.add_bid(order)
+                order.remaining_quantity = remaining_quantity
+                return True
+
+            return remaining_quantity == 0
 
     def process_sell_order(self, order):
         remaining_quantity = order.remaining_quantitiy
+
+        if order.get_order_type() == Type.FOK:
+            total_available = self.calculate_available_bids(order.get_order_price())
+            if total_available < remaining_quantity:
+                return False
+
         while remaining_quantity > 0 and self.bid_prices:
-            best_bid_price = self.bid_prices[0]
-            if best_bid_price < order.get_order_price():
+            best_bid = self.bid_prices[0]
+
+            if (
+                order.get_order_type() == Type.LIMIT
+                and best_bid < order.get_order_price()
+            ):
                 break
-            bid_orders = []
-            for bid in self.bids:
-                if bid == best_bid_price:
-                    bid_orders.append(bid)
-            while bid_orders and remaining_quantity < 0:
-                curr_bid = bid_orders[0]
+
+            orders_at_price = self.bids[best_bid]
+            while orders_at_price and remaining_quantity > 0:
+                curr_bid = orders_at_price[0]
                 trade_quantity = min(curr_bid.remaining_quantity, remaining_quantity)
-                self.execute_trade(best_bid_price, trade_quantity)
+
+                self.execute_trade(
+                    curr_bid.order_price, trade_quantity, order.order_type
+                )
+
                 curr_bid.remaining_quantity -= trade_quantity
                 remaining_quantity -= trade_quantity
+
                 if curr_bid.remaining_quantity == 0:
-                    bid_orders.pop(0)
-                    self.orders.pop(curr_bid.orderID)
-                    if not bid_orders:
-                        self.bid_prices.pop(0)
-                        del self.bids[best_bid_price]
-        if remaining_quantity > 0:
-            order.remaining_quantitiy = remaining_quantity
+                    orders_at_price.pop(0)
+                    self.orders.pop(curr_bid.order_id)
+
+            if not orders_at_price:
+                self.bid_prices.pop(0)
+                del self.bids[best_bid]
+
+            if order.get_order_type() == Type.FOK and remaining_quantity > 0:
+                return False
+
+        if remaining_quantity > 0 and order.get_order_type() == Type.LIMIT:
             self.add_ask(order)
-        return True
+            order.remaining_quantity = remaining_quantity
+            return True
+
+        return remaining_quantity == 0
 
     def execute_trade(self, price, quantitiy):
         trade_id = len(Trade.trade_log) + 1
         Trade(trade_id, price, quantitiy)
 
+    def calculate_available_asks(self, max_price):
+        total = 0
+        for price in self.ask_prices:
+            if price > max_price:
+                break
+            total += sum(order.remaining_quantity for order in self.asks[price])
+        return total
+
+    def calculate_available_bids(self, min_price):
+        total = 0
+        for price in self.bid_prices:
+            if price < min_price:
+                break
+            total += sum(order.remaining_quantity for order in self.bids[price])
+        return total
+
     def add_bid(self, order):
         price = order.get_order_price()
-        temp = []
         if price not in self.bids:
-            for p in self.bid_prices:
-                temp.append(-p)
-            index = bisect.bisect_left(temp, -price)
+            index = bisect.bisect_left([-p for p in self.bid_prices], -price)
             self.bid_prices.insert(index, price)
             self.bids[price] = []
         self.bids[price].append(order)
@@ -160,7 +203,7 @@ class Order:
     def __init__(self, orderprice, orderquantity, type, side):
         if side not in (Side.SELL, Side.BUY):
             raise ValueError("Side must be 0 (sell) or 1 (buy)")
-        if type not in(Type.FOK, Type.LIMIT, Type.MARKET):
+        if type not in (Type.FOK, Type.LIMIT, Type.MARKET):
             raise ValueError("Type must be 0 (Limit), 1 (Market), or 2 (Fill Or Kill)")
         self.orderID = Order._next_orderId_
         self.initialquantitiy = orderquantity
@@ -172,7 +215,7 @@ class Order:
 
     def get_order_price(self):
         return self.order_price
-    
+
     def get_order_type(self):
         return self.order_type
 
@@ -201,7 +244,11 @@ class Trade:
         self.trade_type = trade_type
         self.trade_quantity = trade_quantity
 
-        Trade.trade_log[trade_id] = {"price": trade_price, "quantity": trade_quantity, "type": trade_type}
+        Trade.trade_log[trade_id] = {
+            "price": trade_price,
+            "quantity": trade_quantity,
+            "type": trade_type,
+        }
 
     @classmethod
     def get_trade_log(cls):
@@ -213,13 +260,13 @@ class Trade:
 
 orderbook = OrderBook()
 
+# Test with added side once FOK orders are implemented
+# def main():
+#     new_order = Order(100, 1000, "sell")
+#     new_order2 = Order(100, 500, "buy")
+#     orderbook.fill_order(new_order)
+#     orderbook.fill_order(new_order2)
+#     return orderbook.asks, orderbook.bids
 
-def main():
-    new_order = Order(100, 1000, "sell")
-    new_order2 = Order(100, 500, "buy")
-    orderbook.fill_order(new_order)
-    orderbook.fill_order(new_order2)
-    return orderbook.asks, orderbook.bids
 
-
-print(main())
+# print(main())
