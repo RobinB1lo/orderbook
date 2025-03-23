@@ -1,11 +1,32 @@
+from fastapi import FastAPI, HTTPException
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import HTMLResponse
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 import bisect
-from enums import Side, Type
-from fastapi import FastAPI
+from enum import StrEnum
+import yfinance as yf
 
-# import yfinance as yf
-# import datetime as dt
-# import time
-# import csv
+app = FastAPI()
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+class Side(StrEnum):
+    BUY = "BUY"
+    SELL = "SELL"
+
+
+class Type(StrEnum):
+    LIMIT = "LIMIT"
+    MARKET = "MARKET"
+    FOK = "FOK"
 
 
 class OrderBook:
@@ -18,14 +39,14 @@ class OrderBook:
 
     def fill_order(self, order):
         if order.get_order_side() == Side.BUY:
-            self.process_buy_order(order)
+            return self.process_buy_order(order)
         elif order.get_order_side() == Side.SELL:
-            self.process_sell_order(order)
+            return self.process_sell_order(order)
         else:
             raise ValueError("Invalid order side")
 
     def process_buy_order(self, order):
-        remaining_quantity = order.remaining_quantitiy
+        remaining_quantity = order.remaining_quantity
 
         if order.get_order_type() == Type.FOK:
             total_available = self.calculate_available_asks(order.get_order_price())
@@ -55,7 +76,7 @@ class OrderBook:
 
                 if curr_ask.remaining_quantity == 0:
                     orders_at_price.pop(0)
-                    self.orders.pop(curr_ask.order_id)
+                    self.orders.pop(curr_ask.orderID)
 
                 if not orders_at_price:
                     self.ask_prices.pop(0)
@@ -64,15 +85,15 @@ class OrderBook:
                 if order.get_order_type() == Type.FOK and remaining_quantity > 0:
                     return False
 
-            if remaining_quantity > 0 and order.get_order_type() == Type.LIMIT:
-                self.add_bid(order)
-                order.remaining_quantity = remaining_quantity
-                return True
+        if remaining_quantity > 0 and order.get_order_type() == Type.LIMIT:
+            order.remaining_quantity = remaining_quantity
+            self.add_bid(order)
+            return True
 
-            return remaining_quantity == 0
+        return remaining_quantity == 0
 
     def process_sell_order(self, order):
-        remaining_quantity = order.remaining_quantitiy
+        remaining_quantity = order.remaining_quantity
 
         if order.get_order_type() == Type.FOK:
             total_available = self.calculate_available_bids(order.get_order_price())
@@ -102,7 +123,7 @@ class OrderBook:
 
                 if curr_bid.remaining_quantity == 0:
                     orders_at_price.pop(0)
-                    self.orders.pop(curr_bid.order_id)
+                    self.orders.pop(curr_bid.orderID)
 
             if not orders_at_price:
                 self.bid_prices.pop(0)
@@ -112,15 +133,20 @@ class OrderBook:
                 return False
 
         if remaining_quantity > 0 and order.get_order_type() == Type.LIMIT:
-            self.add_ask(order)
             order.remaining_quantity = remaining_quantity
+            self.add_ask(order)
             return True
 
         return remaining_quantity == 0
 
-    def execute_trade(self, price, quantitiy):
+    def execute_trade(self, price, quantity, order_type):
         trade_id = len(Trade.trade_log) + 1
-        Trade(trade_id, price, quantitiy)
+        Trade(
+            trade_id=trade_id,
+            trade_price=price,
+            trade_type=order_type,
+            trade_quantity=quantity,
+        )
 
     def calculate_available_asks(self, max_price):
         total = 0
@@ -145,7 +171,7 @@ class OrderBook:
             self.bid_prices.insert(index, price)
             self.bids[price] = []
         self.bids[price].append(order)
-        self.orders[order.orderID] = (price, "bid")
+        self.orders[order.orderID] = (price, order.order_side)
 
     def add_ask(self, order):
         price = order.get_order_price()
@@ -154,7 +180,7 @@ class OrderBook:
             self.ask_prices.insert(index, price)
             self.asks[price] = []
         self.asks[price].append(order)
-        self.orders[order.orderID] = (price, "ask")
+        self.orders[order.orderID] = (price, order.order_side)
 
     def cancel_order(self, orderID):
         if orderID not in self.orders:
@@ -164,32 +190,26 @@ class OrderBook:
 
         if side == Side.BUY:
             order_list = self.bids.get(price, [])
-
             for i, order in enumerate(order_list):
                 if order.orderID == orderID:
                     order_list.pop(i)
                     break
-
             if not order_list:
                 if price in self.bids:
                     del self.bids[price]
-
                 index = bisect.bisect_left(self.bid_prices, price)
                 if index < len(self.bid_prices) and self.bid_prices[index] == price:
                     self.bid_prices.pop(index)
 
         elif side == Side.SELL:
-            order_list = self.bids.get(price, [])
-
+            order_list = self.asks.get(price, [])
             for i, order in enumerate(order_list):
                 if order.orderID == orderID:
                     order_list.pop(i)
                     break
-
             if not order_list:
                 if price in self.asks:
                     del self.asks[price]
-
                 index = bisect.bisect_left(self.ask_prices, price)
                 if index < len(self.ask_prices) and self.ask_prices[index] == price:
                     self.ask_prices.pop(index)
@@ -202,12 +222,12 @@ class Order:
 
     def __init__(self, orderprice, orderquantity, type, side):
         if side not in (Side.SELL, Side.BUY):
-            raise ValueError("Side must be 0 (sell) or 1 (buy)")
+            raise ValueError("Side must be SELL or BUY")
         if type not in (Type.FOK, Type.LIMIT, Type.MARKET):
-            raise ValueError("Type must be 0 (Limit), 1 (Market), or 2 (Fill Or Kill)")
+            raise ValueError("Type must be LIMIT, MARKET, or FOK")
         self.orderID = Order._next_orderId_
-        self.initialquantitiy = orderquantity
-        self.remaining_quantitiy = orderquantity
+        self.initial_quantity = orderquantity
+        self.remaining_quantity = orderquantity
         self.order_price = orderprice
         self.order_side = side
         self.order_type = type
@@ -225,14 +245,14 @@ class Order:
     def get_order_id(self):
         return self.orderID
 
-    def get_initial_quantitiy(self):
-        return self.initialquantitiy
+    def get_initial_quantity(self):
+        return self.initial_quantity
 
-    def get_remaining_quantitiy(self):
-        return self.remaining_quantitiy
+    def get_remaining_quantity(self):
+        return self.remaining_quantity
 
     def get_filled_quantity(self):
-        return self.initialquantitiy - self.remaining_quantitiy
+        return self.initial_quantity - self.remaining_quantity
 
 
 class Trade:
@@ -258,15 +278,172 @@ class Trade:
         return f"Trade ID: {self.trade_id}\t Trade price: {self.trade_price}\t Trade Quantity: {self.trade_quantity}\t Total: {self.trade_quantity * self.trade_price}"
 
 
-orderbook = OrderBook()
-
-# Test with added side once FOK orders are implemented
-# def main():
-#     new_order = Order(100, 1000, "sell")
-#     new_order2 = Order(100, 500, "buy")
-#     orderbook.fill_order(new_order)
-#     orderbook.fill_order(new_order2)
-#     return orderbook.asks, orderbook.bids
+order_books = {}
 
 
-# print(main())
+def get_current_price(symbol):
+    try:
+        ticker = yf.Ticker(symbol)
+        data = ticker.history(period="1d", interval="1m")
+        if not data.empty:
+            return float(data["Close"].iloc[-1])
+        print(f"No data for {symbol}. Using placeholder price.")
+        return 100.0
+    except Exception as e:
+        print(f"Price error for {symbol}: {str(e)}")
+        return 100.0
+
+
+class OrderRequest(BaseModel):
+    symbol: str
+    side: Side
+    type: Type
+    price: float
+    quantity: int
+
+
+@app.get("/", response_class=HTMLResponse)
+async def trading_interface():
+    return """
+    <html>
+        <head>
+            <title>RobinBook</title>
+            <script src="/static/trading.js"></script>
+            <style>
+                body {
+                    font-family: 'Courier New', Courier, monospace;
+                    background-color: #1e1e1e;
+                    color: #00ff00;
+                    padding: 20px;
+                }
+
+                h1, h2, h3 {
+                    font-family: 'Courier New', Courier, monospace;
+                }
+
+                table {
+                    border-collapse: collapse;
+                    width: 100%;
+                }
+
+                th, td {
+                    border: 1px solid #00ff00;
+                    padding: 8px;
+                    text-align: left;
+                }
+
+                th {
+                    background-color: #333;
+                }
+
+                tr:nth-child(even) {
+                    background-color: #222;
+                }
+            </style>
+        </head>
+        <body>
+            <h1>Robin's OrderBook</h1>
+            <div class="container">
+                <div class="order-box">
+                    <h2>Order Book: <span id="current-symbol">TSLA</span></h2>
+                    <div id="order-book"></div>
+                </div>
+                <div class="order-box">
+                    <h2>Place Order</h2>
+                    <select id="symbol" onchange="updateSymbol()">
+                        <option value="TSLA">TSLA</option>
+                        <option value="AAPL">AAPL</option>
+                        <option value="GOOG">GOOG</option>
+                    </select>
+                    <select id="side">
+                        <option value="BUY">Buy</option>
+                        <option value="SELL">Sell</option>
+                    </select>
+                    <select id="type">
+                        <option value="LIMIT">Limit</option>
+                        <option value="MARKET">Market</option>
+                        <option value="FOK">FOK</option>
+                    </select><br>
+                    <input type="number" id="price" step="0.01" placeholder="Price">
+                    <input type="number" id="quantity" placeholder="Quantity"><br>
+                    <button onclick="placeOrder()">Submit Order</button>
+                    <h3>Trade History</h3>
+                    <div id="trades"></div>
+                </div>
+            </div>
+        </body>
+    </html>
+    """
+
+
+@app.post("/api/order")
+async def place_order(order: OrderRequest):
+    print(f"Received order: {order}")
+
+    if order.symbol not in order_books:
+        order_books[order.symbol] = OrderBook()
+
+    try:
+        side = Side.BUY if order.side == "BUY" else Side.SELL
+        order_type = {"LIMIT": Type.LIMIT, "MARKET": Type.MARKET, "FOK": Type.FOK}[
+            order.type
+        ]
+
+        order_obj = Order(
+            orderprice=order.price,
+            orderquantity=order.quantity,
+            type=order_type,
+            side=side,
+        )
+
+        ob = order_books[order.symbol]
+        success = ob.fill_order(order_obj)
+
+        if not success:
+            raise HTTPException(400, detail="Order could not be filled")
+
+        return {"status": "success", "order_id": order_obj.orderID}
+
+    except Exception as e:
+        print(f"Order failed: {str(e)}")
+        raise HTTPException(400, detail=str(e))
+
+
+@app.get("/api/orderbook/{symbol}")
+async def get_orderbook(symbol: str):
+    if symbol not in order_books:
+        order_books[symbol] = OrderBook()
+
+    ob = order_books[symbol]
+    current_price = get_current_price(symbol)
+
+    return {
+        "price": current_price if current_price else 100.0,  # Fallback price
+        "bids": {
+            price: [o.remaining_quantity for o in orders]
+            for price, orders in ob.bids.items()
+        },
+        "asks": {
+            price: [o.remaining_quantity for o in orders]
+            for price, orders in ob.asks.items()
+        },
+    }
+
+
+@app.get("/api/trades")
+async def get_trades():
+    return Trade.trade_log
+
+
+@app.delete("/api/order/{order_id}")
+async def cancel_order(order_id: int):
+    for symbol, ob in order_books.items():
+        if ob.cancel_order(order_id):
+            return {"status": "cancelled"}
+    raise HTTPException(404, detail="Order not found")
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(app, host="0.0.0.0", port=8000)
