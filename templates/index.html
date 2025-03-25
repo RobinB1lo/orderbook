@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>RobinBook</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="/static/trading.js" defer></script>
+    <style>
+        body {
+            font-family: 'Courier New', Courier, monospace;
+            background-color: #1e1e1e;
+            color: #00ff00;
+            padding: 20px;
+        }
+
+        h1, h2, h3 {
+            font-family: 'Courier New', Courier, monospace;
+        }
+
+        table {
+            border-collapse: collapse;
+            width: 100%;
+        }
+
+        th, td {
+            border: 1px solid #00ff00;
+            padding: 8px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #333;
+        }
+
+        tr:nth-child(even) {
+            background-color: #222;
+        }
+
+        .container {
+            display: flex;
+            justify-content: space-between;
+            gap: 20px;
+        }
+
+        .order-box {
+            width: 48%;
+            padding: 15px;
+            background-color: #333;
+            border: 1px solid #00ff00;
+            border-radius: 8px;
+        }
+
+        input, select, button {
+            margin-top: 10px;
+            padding: 8px;
+            background-color: #1e1e1e;
+            color: #00ff00;
+            border: 1px solid #00ff00;
+        }
+
+        button {
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #00ff00;
+            color: #1e1e1e;
+        }
+
+        #trades {
+            margin-top: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #00ff00;
+            padding: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Robin's OrderBook</h1>
+    <div class="container">
+        <div class="order-box">
+            <h2>Order Book: <span id="current-symbol">TSLA</span></h2>
+            <div id="order-book"></div>
+        </div>
+        <div class="order-box">
+            <h2>Place Order</h2>
+            <select id="symbol" onchange="updateSymbol()">
+                <option value="TSLA">TSLA</option>
+                <option value="AAPL">AAPL</option>
+                <option value="GOOG">GOOG</option>
+            </select>
+            <select id="side">
+                <option value="BUY">Buy</option>
+                <option value="SELL">Sell</option>
+            </select>
+            <select id="type">
+                <option value="LIMIT">Limit</option>
+                <option value="MARKET">Market</option>
+                <option value="FOK">FOK</option>
+            </select><br>
+            <input type="number" id="price" step="0.01" placeholder="Price">
+            <input type="number" id="quantity" placeholder="Quantity"><br>
+            <button onclick="placeOrder()">Submit Order</button>
+            <h3>Trade History</h3>
+            <div id="trades"></div>
+        </div>
+    </div>
+</body>
+</html>

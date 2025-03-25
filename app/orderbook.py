@@ -1,7 +1,8 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 import bisect
 from enum import StrEnum
@@ -16,6 +17,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+templates = Jinja2Templates(directory="templates")
 
 
 class Side(StrEnum):
@@ -303,77 +307,8 @@ class OrderRequest(BaseModel):
 
 
 @app.get("/", response_class=HTMLResponse)
-async def trading_interface():
-    return """
-    <html>
-        <head>
-            <title>RobinBook</title>
-            <script src="/static/trading.js"></script>
-            <style>
-                body {
-                    font-family: 'Courier New', Courier, monospace;
-                    background-color: #1e1e1e;
-                    color: #00ff00;
-                    padding: 20px;
-                }
-
-                h1, h2, h3 {
-                    font-family: 'Courier New', Courier, monospace;
-                }
-
-                table {
-                    border-collapse: collapse;
-                    width: 100%;
-                }
-
-                th, td {
-                    border: 1px solid #00ff00;
-                    padding: 8px;
-                    text-align: left;
-                }
-
-                th {
-                    background-color: #333;
-                }
-
-                tr:nth-child(even) {
-                    background-color: #222;
-                }
-            </style>
-        </head>
-        <body>
-            <h1>Robin's OrderBook</h1>
-            <div class="container">
-                <div class="order-box">
-                    <h2>Order Book: <span id="current-symbol">TSLA</span></h2>
-                    <div id="order-book"></div>
-                </div>
-                <div class="order-box">
-                    <h2>Place Order</h2>
-                    <select id="symbol" onchange="updateSymbol()">
-                        <option value="TSLA">TSLA</option>
-                        <option value="AAPL">AAPL</option>
-                        <option value="GOOG">GOOG</option>
-                    </select>
-                    <select id="side">
-                        <option value="BUY">Buy</option>
-                        <option value="SELL">Sell</option>
-                    </select>
-                    <select id="type">
-                        <option value="LIMIT">Limit</option>
-                        <option value="MARKET">Market</option>
-                        <option value="FOK">FOK</option>
-                    </select><br>
-                    <input type="number" id="price" step="0.01" placeholder="Price">
-                    <input type="number" id="quantity" placeholder="Quantity"><br>
-                    <button onclick="placeOrder()">Submit Order</button>
-                    <h3>Trade History</h3>
-                    <div id="trades"></div>
-                </div>
-            </div>
-        </body>
-    </html>
-    """
+async def trading_interface(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request})
 
 
 @app.post("/api/order")

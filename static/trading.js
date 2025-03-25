@@ -39,6 +39,7 @@ function updateOrderBook() {
             document.getElementById('order-book').innerHTML = 'Failed to load order book';
         });
 }
+
 function placeOrder() {
     const order = {
         symbol: currentSymbol,
