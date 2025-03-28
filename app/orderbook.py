@@ -376,9 +376,3 @@ async def cancel_order(order_id: int):
         if ob.cancel_order(order_id):
             return {"status": "cancelled"}
     raise HTTPException(404, detail="Order not found")
-
-
-if __name__ == "__main__":
-    import uvicorn
-
-    uvicorn.run(app, host="0.0.0.0", port=8000)
