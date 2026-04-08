@@ -2,109 +2,117 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>RobinBook</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/style.css">
     <script src="/static/trading.js" defer></script>
-    <style>
-        body {
-            font-family: 'Courier New', Courier, monospace;
-            background-color: #1e1e1e;
-            color: #00ff00;
-            padding: 20px;
-        }
-
-        h1, h2, h3 {
-            font-family: 'Courier New', Courier, monospace;
-        }
-
-        table {
-            border-collapse: collapse;
-            width: 100%;
-        }
-
-        th, td {
-            border: 1px solid #00ff00;
-            padding: 8px;
-            text-align: left;
-        }
-
-        th {
-            background-color: #333;
-        }
-
-        tr:nth-child(even) {
-            background-color: #222;
-        }
-
-        .container {
-            display: flex;
-            justify-content: space-between;
-            gap: 20px;
-        }
-
-        .order-box {
-            width: 48%;
-            padding: 15px;
-            background-color: #333;
-            border: 1px solid #00ff00;
-            border-radius: 8px;
-        }
-
-        input, select, button {
-            margin-top: 10px;
-            padding: 8px;
-            background-color: #1e1e1e;
-            color: #00ff00;
-            border: 1px solid #00ff00;
-        }
-
-        button {
-            cursor: pointer;
-        }
-
-        button:hover {
-            background-color: #00ff00;
-            color: #1e1e1e;
-        }
-
-        #trades {
-            margin-top: 10px;
-            max-height: 200px;
-            overflow-y: auto;
-            border: 1px solid #00ff00;
-            padding: 10px;
-        }
-    </style>
 </head>
 <body>
-    <h1>Robin's OrderBook</h1>
-    <div class="container">
-        <div class="order-box">
-            <h2>Order Book: <span id="current-symbol">TSLA</span></h2>
-            <div id="order-book"></div>
+
+    <header class="topbar">
+        <div class="topbar-brand">RobinBook</div>
+
+        <div class="symbol-tabs" id="symbol-tabs">
+            <button class="symbol-tab active" onclick="setSymbol('TSLA')">TSLA</button>
+            <button class="symbol-tab" onclick="setSymbol('AAPL')">AAPL</button>
+            <button class="symbol-tab" onclick="setSymbol('GOOG')">GOOG</button>
         </div>
-        <div class="order-box">
-            <h2>Place Order</h2>
-            <select id="symbol" onchange="updateSymbol()">
-                <option value="TSLA">TSLA</option>
-                <option value="AAPL">AAPL</option>
-                <option value="GOOG">GOOG</option>
-            </select>
-            <select id="side">
-                <option value="BUY">Buy</option>
-                <option value="SELL">Sell</option>
-            </select>
-            <select id="type">
-                <option value="LIMIT">Limit</option>
-                <option value="MARKET">Market</option>
-                <option value="FOK">FOK</option>
-            </select><br>
-            <input type="number" id="price" step="0.01" placeholder="Price">
-            <input type="number" id="quantity" placeholder="Quantity"><br>
-            <button onclick="placeOrder()">Submit Order</button>
-            <h3>Trade History</h3>
-            <div id="trades"></div>
+
+        <div class="topbar-price">
+            <span class="topbar-price-label">Last Price</span>
+            <span class="topbar-price-value" id="current-price">—</span>
         </div>
-    </div>
+    </header>
+
+    <main class="layout">
+
+        <!-- ── Order Book ── -->
+        <section class="panel" id="panel-book">
+            <div class="panel-header">
+                <span class="panel-title">Order Book</span>
+                <span class="panel-meta">Price (USD) · Size</span>
+            </div>
+
+            <div class="book-grid">
+                <!-- Column headers -->
+                <div class="book-col-header">
+                    <span>Price</span>
+                    <span>Size</span>
+                    <span>Total</span>
+                </div>
+
+                <!-- Asks (sell side) — displayed descending so lowest ask is at bottom -->
+                <div class="book-side asks" id="asks-rows"></div>
+
+                <!-- Spread -->
+                <div class="spread-row" id="spread-row">
+                    <span class="spread-label">Spread</span>
+                    <span class="spread-value" id="spread-value">—</span>
+                </div>
+
+                <!-- Bids (buy side) — highest bid at top -->
+                <div class="book-side bids" id="bids-rows"></div>
+            </div>
+        </section>
+
+        <!-- ── Order Form ── -->
+        <aside class="panel" id="panel-form">
+            <div class="panel-header">
+                <span class="panel-title">Place Order</span>
+            </div>
+
+            <div class="order-form">
+
+                <!-- Buy / Sell toggle -->
+                <div class="side-toggle">
+                    <button class="side-btn active buy" id="btn-buy"  onclick="setSide('BUY')">Buy</button>
+                    <button class="side-btn sell"        id="btn-sell" onclick="setSide('SELL')">Sell</button>
+                </div>
+
+                <!-- Order type -->
+                <div class="form-group">
+                    <label class="form-label">Order Type</label>
+                    <div class="type-tabs">
+                        <button class="type-tab active" id="tab-LIMIT"  onclick="setType('LIMIT')">Limit</button>
+                        <button class="type-tab"        id="tab-MARKET" onclick="setType('MARKET')">Market</button>
+                        <button class="type-tab"        id="tab-FOK"    onclick="setType('FOK')">FOK</button>
+                    </div>
+                </div>
+
+                <!-- Price (hidden for market orders) -->
+                <div class="form-group" id="price-group">
+                    <label class="form-label" for="price">Price (USD)</label>
+                    <input class="form-input" type="number" id="price" step="0.01" min="0" placeholder="0.00">
+                </div>
+
+                <!-- Quantity -->
+                <div class="form-group">
+                    <label class="form-label" for="quantity">Quantity</label>
+                    <input class="form-input" type="number" id="quantity" min="1" placeholder="0">
+                </div>
+
+                <!-- Submit -->
+                <button class="submit-btn buy" id="submit-btn" onclick="placeOrder()">
+                    Buy <span id="submit-symbol">TSLA</span>
+                </button>
+
+                <!-- Inline status -->
+                <div class="status-msg" id="status-msg"></div>
+            </div>
+
+            <!-- Trade History -->
+            <div class="panel-header" style="margin-top:28px;">
+                <span class="panel-title">Recent Trades</span>
+            </div>
+            <div class="trades-list" id="trades-list">
+                <div class="empty-state">No trades yet</div>
+            </div>
+        </aside>
+
+    </main>
+
 </body>
 </html>

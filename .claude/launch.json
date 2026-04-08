@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "orderbook",
+      "runtimeExecutable": "/Users/robinbilodeau/Desktop/repos/orderbook/env/bin/python",
+      "runtimeArgs": ["main.py"],
+      "port": 3000
+    }
+  ]
+}
