@@ -1,36 +1,5 @@
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel
 import bisect
-from enum import StrEnum
-import yfinance as yf
-
-app = FastAPI()
-app.mount("/static", StaticFiles(directory="static"), name="static")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-
-templates = Jinja2Templates(directory="templates")
-
-
-class Side(StrEnum):
-    BUY = "BUY"
-    SELL = "SELL"
-
-
-class Type(StrEnum):
-    LIMIT = "LIMIT"
-    MARKET = "MARKET"
-    FOK = "FOK"
+from .models import Side, Type, Order, Trade
 
 
 class OrderBook:
@@ -71,9 +40,7 @@ class OrderBook:
                 curr_ask = orders_at_price[0]
                 trade_quantity = min(curr_ask.remaining_quantity, remaining_quantity)
 
-                self.execute_trade(
-                    curr_ask.order_price, trade_quantity, order.order_type
-                )
+                self._execute_trade(curr_ask.order_price, trade_quantity, order.order_type)
 
                 curr_ask.remaining_quantity -= trade_quantity
                 remaining_quantity -= trade_quantity
@@ -118,9 +85,7 @@ class OrderBook:
                 curr_bid = orders_at_price[0]
                 trade_quantity = min(curr_bid.remaining_quantity, remaining_quantity)
 
-                self.execute_trade(
-                    curr_bid.order_price, trade_quantity, order.order_type
-                )
+                self._execute_trade(curr_bid.order_price, trade_quantity, order.order_type)
 
                 curr_bid.remaining_quantity -= trade_quantity
                 remaining_quantity -= trade_quantity
@@ -143,7 +108,7 @@ class OrderBook:
 
         return remaining_quantity == 0
 
-    def execute_trade(self, price, quantity, order_type):
+    def _execute_trade(self, price, quantity, order_type):
         trade_id = len(Trade.trade_log) + 1
         Trade(
             trade_id=trade_id,
@@ -219,160 +184,3 @@ class OrderBook:
                     self.ask_prices.pop(index)
 
         return True
-
-
-class Order:
-    _next_orderId_ = 0
-
-    def __init__(self, orderprice, orderquantity, type, side):
-        if side not in (Side.SELL, Side.BUY):
-            raise ValueError("Side must be SELL or BUY")
-        if type not in (Type.FOK, Type.LIMIT, Type.MARKET):
-            raise ValueError("Type must be LIMIT, MARKET, or FOK")
-        self.orderID = Order._next_orderId_
-        self.initial_quantity = orderquantity
-        self.remaining_quantity = orderquantity
-        self.order_price = orderprice
-        self.order_side = side
-        self.order_type = type
-        Order._next_orderId_ += 1
-
-    def get_order_price(self):
-        return self.order_price
-
-    def get_order_type(self):
-        return self.order_type
-
-    def get_order_side(self):
-        return self.order_side
-
-    def get_order_id(self):
-        return self.orderID
-
-    def get_initial_quantity(self):
-        return self.initial_quantity
-
-    def get_remaining_quantity(self):
-        return self.remaining_quantity
-
-    def get_filled_quantity(self):
-        return self.initial_quantity - self.remaining_quantity
-
-
-class Trade:
-    trade_log = {}
-
-    def __init__(self, trade_id, trade_price, trade_type, trade_quantity):
-        self.trade_id = trade_id
-        self.trade_price = trade_price
-        self.trade_type = trade_type
-        self.trade_quantity = trade_quantity
-
-        Trade.trade_log[trade_id] = {
-            "price": trade_price,
-            "quantity": trade_quantity,
-            "type": trade_type,
-        }
-
-    @classmethod
-    def get_trade_log(cls):
-        return cls.trade_log
-
-    def get_trade_info(self):
-        return f"Trade ID: {self.trade_id}\t Trade price: {self.trade_price}\t Trade Quantity: {self.trade_quantity}\t Total: {self.trade_quantity * self.trade_price}"
-
-
-order_books = {}
-
-
-def get_current_price(symbol):
-    try:
-        ticker = yf.Ticker(symbol)
-        data = ticker.history(period="1d", interval="1m")
-        if not data.empty:
-            return float(data["Close"].iloc[-1])
-        print(f"No data for {symbol}. Using placeholder price.")
-        return 100.0
-    except Exception as e:
-        print(f"Price error for {symbol}: {str(e)}")
-        return 100.0
-
-
-class OrderRequest(BaseModel):
-    symbol: str
-    side: Side
-    type: Type
-    price: float
-    quantity: int
-
-
-@app.get("/", response_class=HTMLResponse)
-async def trading_interface(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
-
-
-@app.post("/api/order")
-async def place_order(order: OrderRequest):
-    print(f"Received order: {order}")
-
-    if order.symbol not in order_books:
-        order_books[order.symbol] = OrderBook()
-
-    try:
-        side = Side.BUY if order.side == "BUY" else Side.SELL
-        order_type = {"LIMIT": Type.LIMIT, "MARKET": Type.MARKET, "FOK": Type.FOK}[
-            order.type
-        ]
-
-        order_obj = Order(
-            orderprice=order.price,
-            orderquantity=order.quantity,
-            type=order_type,
-            side=side,
-        )
-
-        ob = order_books[order.symbol]
-        success = ob.fill_order(order_obj)
-
-        if not success:
-            raise HTTPException(400, detail="Order could not be filled")
-
-        return {"status": "success", "order_id": order_obj.orderID}
-
-    except Exception as e:
-        print(f"Order failed: {str(e)}")
-        raise HTTPException(400, detail=str(e))
-
-
-@app.get("/api/orderbook/{symbol}")
-async def get_orderbook(symbol: str):
-    if symbol not in order_books:
-        order_books[symbol] = OrderBook()
-
-    ob = order_books[symbol]
-    current_price = get_current_price(symbol)
-
-    return {
-        "price": current_price if current_price else 100.0,  # Fallback price
-        "bids": {
-            price: [o.remaining_quantity for o in orders]
-            for price, orders in ob.bids.items()
-        },
-        "asks": {
-            price: [o.remaining_quantity for o in orders]
-            for price, orders in ob.asks.items()
-        },
-    }
-
-
-@app.get("/api/trades")
-async def get_trades():
-    return Trade.trade_log
-
-
-@app.delete("/api/order/{order_id}")
-async def cancel_order(order_id: int):
-    for symbol, ob in order_books.items():
-        if ob.cancel_order(order_id):
-            return {"status": "cancelled"}
-    raise HTTPException(404, detail="Order not found")
