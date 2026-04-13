@@ -1,0 +1,2 @@
+[console_scripts]
+robinbook = orderbook.__main__:main
